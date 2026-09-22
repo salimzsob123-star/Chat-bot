@@ -5,6 +5,9 @@ load_dotenv()
 from anthropic import Anthropic
 client = Anthropic()
 model = "claude-haiku-4-5"
+# سطر تشخيصي مؤقت — احذفه بعد ما تتأكد
+loaded_key = os.environ.get("ANTHROPIC_API_KEY", "غير موجود")
+print(f"🔑 المفتاح المُحمّل: {loaded_key[:15]}...{loaded_key[-6:]}")
 
 def add_user_message(messages, text):
     user_message = {"role": "user", "content": text}
@@ -263,7 +266,7 @@ system_prompt=f"""
    - استخدم اللغة العربية الفصحى بلغة بسيطة ومهنية.
    - قم بتنسيق الخطوات الإجرائية على شكل أرقام عربية هندية مرتبة لتسهيل القراءة.
 4. إذا كان السؤال غير واضح مثل إضافة فاتورة أو كيف أدخل الإعدادات فأطلب توضيح من العميل بشكل مؤدب، أساله عن النظام المراد استخدامه أو القسم المراد أو الشاشة المراد على حسب نوع السؤال.
-5.رحب في العميل فقط في أول رسالة فقط يعني أول مرة يسألك، بعدين إذا سئل سؤال آخر أو طلب عطيه الجواب مباشرة فقط الجواب لا ترحب فيه ثاني.
+5.-إلزامي: كل خطوة إجرائية يجب أن تكون في سطر منفصل تماماً، مع سطر فارغ فاصل بينها وبين الخطوة التالية. لا تكتب خطوتين أو أكثر بنفس السطر أبداً، حتى لو كانت قصيرة.
 </instructions>
 
 <knowledge_base>
@@ -298,17 +301,6 @@ system_prompt=f"""
 </assistant_response>
 </example>
 </examples>
-
-<example>
-<user_query>كيف أربط النظام مع هيئة الزكاة والدخل؟</user_query>
-<assistant_response>
-عذراً منك، هذه المعلومة غير متوفرة في دليلي الحالي. يرجى الاتصال أو التواصل واتس اب على الدعم الفني عن طريق الرقم التالي: +966 55 053 8747 أو +966 50 534 7079 .
-</assistant_response>
-<user_query>طيب، كيف أدخل النظام؟</user_query>
-<assistant_response>
-أدخل من خلال أيقونة سطح المكتب، أو من خلال رابط في حالة كان سحابي.
-</assistant_response>
-</example>
     """
 
 app1 = Flask(__name__)
@@ -316,24 +308,26 @@ app1 = Flask(__name__)
 # 1. تحديد مفتاح الأمان السرّي (يمكن تغييره لما تريد)
 CHAT_SECRET_KEY = os.getenv("CHAT_SECRET_KEY", "Smartex123$$$")
 
+conversation_history = []
+
 @app1.route("/")
 def home():
     return render_template("index.html")
 
+
 @app1.route("/chat", methods=["POST"])
 def handle_chat():
-    # 2. التحقق من وجود مفتاح الأمان في الهيدر قبل تنفيذ أي شيء
     client_secret = request.headers.get("X-App-Secret")
     if client_secret != CHAT_SECRET_KEY:
         return jsonify({"error": "غير مصرح لك بالوصول لهذا الرابط"}), 403
 
-    # باقي كودك كما هو تماماً دون حذوفات
     data = request.json
     user_question = data.get("message", "")
-    messages = []
-    add_user_message(messages, user_question)
-    answer = chat(messages)
-    add_assistant_message(messages, answer)
+
+    add_user_message(conversation_history, user_question)
+    answer = chat(conversation_history)
+    add_assistant_message(conversation_history, answer)
+
     return jsonify({"answer": answer})
 
 if __name__ == "__main__":
